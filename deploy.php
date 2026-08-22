@@ -177,14 +177,32 @@ if (!is_writable(DEPLOY_REPO . '/.git')) {
         . '. git writes there on every fetch: chown -R ' . whoami() . ' ' . DEPLOY_REPO);
 }
 
+/**
+ * Turns a git failure into the thing to do about it, where the fix is not obvious
+ * from what git said.
+ */
+function git_hint(string $output): string {
+    if (str_contains($output, 'dubious ownership')) {
+        return ' — git refuses to work in a repository owned by another user. Either give it to '
+            . whoami() . ' (chown -R ' . whoami() . ' ' . DEPLOY_REPO . '), which is what you want on a'
+            . ' deploy target, or tell git to allow it: sudo -u ' . whoami()
+            . ' git config --global --add safe.directory ' . DEPLOY_REPO;
+    }
+    if (str_contains($output, 'could not read Username') || str_contains($output, 'Authentication failed')) {
+        return ' — the remote is asking for credentials. A deploy target should track a public HTTPS'
+            . ' remote or use a read-only deploy key, since nobody is here to type a password.';
+    }
+    return '';
+}
+
 // fetch and reset, not pull: a deploy target has no local work worth merging, and
 // `pull --ff-only` fails after a force-push upstream — which leaves the site on an
 // old version behind a webhook still reporting success.
 [$code, $out] = git(['fetch', '--quiet', 'origin', DEPLOY_BRANCH]);
-if ($code !== 0) say(500, "fetch failed: $out");
+if ($code !== 0) say(500, "fetch failed: $out" . git_hint($out));
 
 [$code, $out] = git(['reset', '--hard', '--quiet', 'origin/' . DEPLOY_BRANCH]);
-if ($code !== 0) say(500, "reset failed: $out");
+if ($code !== 0) say(500, "reset failed: $out" . git_hint($out));
 
 [, $head] = git(['rev-parse', '--short', 'HEAD']);
 

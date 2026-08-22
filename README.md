@@ -102,6 +102,7 @@ inside the checkout, never at its root. Serving the root publishes `.git`, and
 | A payload over 1 MB | `413` |
 | A body that is neither JSON nor `payload=` | `400` |
 | `DEPLOY_REPO` unreachable or not a checkout | `500`, naming the user and where to put it |
+| A checkout owned by another user | `500`, with both ways out — see below |
 | A push to another branch | `202 ignored: refs/heads/…` |
 | Any other event | `202` |
 | GitHub's ping | `200 pong` |
@@ -114,6 +115,21 @@ Both content types are accepted. GitHub's form defaults to
 the signature covers the raw body either way, so the only symptom of the
 mismatch would have been a webhook that answers `pong` to the ping and `400` to
 every push after it.
+
+### The checkout has to belong to the deploy user
+
+Git 2.35.2 and later refuse to operate in a repository owned by somebody else —
+`detected dubious ownership` — which is exactly what a `sudo git clone` followed
+by a deploy running as `www-data` produces. Two ways out, and the first is the
+one you want:
+
+```bash
+sudo chown -R www-data:www-data /srv/your-site
+# or, if the checkout must stay owned by someone else:
+sudo -u www-data git config --global --add safe.directory /srv/your-site
+```
+
+The failure names both when it sees it.
 
 ## What it will not do
 

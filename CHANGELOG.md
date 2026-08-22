@@ -46,6 +46,9 @@ push a week. GitHub already knows the moment you pushed.
   over the old one.
 - Every answer — deploys, refusals and ignored events — written to `DEPLOY_LOG`,
   because a webhook that silently does nothing is the failure people actually hit.
+- A git failure now carries the fix where git's own message does not imply one:
+  `dubious ownership` gets both the `chown` and the `safe.directory` line, and an
+  authentication prompt gets told that nobody is there to answer it.
 - Publishing no longer requires a writable web root. The atomic rename needs write
   permission on the destination directory, which is the thing hardening guides
   tell you not to grant; when only the target file is writable it is overwritten
