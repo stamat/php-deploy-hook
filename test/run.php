@@ -102,6 +102,36 @@ function commit(string $text): void {
 
 echo "php-deploy-hook\n";
 
+// --- the config it writes ----------------------------------------------------
+
+it('the config it prints is valid PHP, with a secret nobody can guess', function () {
+    $proc = proc_open([PHP_BINARY, __DIR__ . '/../deploy.php'],
+        [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    $out = stream_get_contents($pipes[1]);
+    array_map('fclose', [$pipes[1], $pipes[2]]);
+    proc_close($proc);
+
+    $file = $GLOBALS['root'] . '/printed.config.php';
+    file_put_contents($file, $out);
+
+    // The whole point: what comes out of here parses. A blank 500 from a hand-typed
+    // config is what this replaces.
+    [$code, $lint] = run(PHP_BINARY, '-l', $file);
+    assert_that($code === 0, "the printed config does not parse: $lint");
+
+    assert_that(preg_match("~define\\('DEPLOY_SECRET', '([0-9a-f]{64})'\\);~", $out) === 1,
+        "no usable secret in the printed config: $out");
+    assert_that(str_contains($out, "define('DEPLOY_PUBLISH'"), 'the printed config does not mention what to publish');
+    assert_that(str_contains($out, '/absolute/path/to/the/checkout'),
+        'a path was guessed rather than left as a placeholder, which deploys the wrong thing quietly');
+
+    $again = proc_open([PHP_BINARY, __DIR__ . '/../deploy.php'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes2);
+    $second = stream_get_contents($pipes2[1]);
+    array_map('fclose', [$pipes2[1], $pipes2[2]]);
+    proc_close($again);
+    assert_that($out !== $second, 'two runs printed the same secret');
+});
+
 // --- what it refuses before it touches anything ------------------------------
 
 it('a payload signed with the wrong secret is refused, and nothing is deployed', function () {

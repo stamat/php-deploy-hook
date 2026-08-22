@@ -19,6 +19,31 @@ defined('DEPLOY_BRANCH')  || define('DEPLOY_BRANCH', 'main');
 defined('DEPLOY_PUBLISH') || define('DEPLOY_PUBLISH', []);           // ['file/in/repo' => '/absolute/destination']
 defined('DEPLOY_LOG')     || define('DEPLOY_LOG', '');               // a path, or '' for error_log
 
+// ---- the command line -------------------------------------------------------
+
+if (PHP_SAPI === 'cli') {
+    // Printed rather than written, so it cannot overwrite a config that is already
+    // there — and a config that came out of here parses, which is more than can be
+    // said for one typed at midnight.
+    // The secret is generated because a machine picks a better one. Every path is
+    // left as a placeholder on purpose: guessing them produces a config that
+    // parses and deploys the wrong thing, which is worse than an obvious blank.
+    echo "<?php\n"
+       . "define('DEPLOY_SECRET', '" . bin2hex(random_bytes(32)) . "');\n"
+       . "define('DEPLOY_REPO', '/absolute/path/to/the/checkout');       // outside the web root\n"
+       . "define('DEPLOY_BRANCH', 'main');\n"
+       . "define('DEPLOY_PUBLISH', [\n"
+       . "    // 'file/in/the/repo.php' => '/absolute/path/in/the/web/root.php',\n"
+       . "]);\n"
+       . "define('DEPLOY_LOG', '/absolute/path/to/deploy.log');          // outside the web root too\n";
+
+    fwrite(STDERR, "\nThat is a config. Redirect it into deploy.config.php beside deploy.php,\n"
+        . "fill in DEPLOY_PUBLISH, and give GitHub the same secret:\n\n"
+        . "  php deploy.php > deploy.config.php\n"
+        . "  php -l deploy.config.php\n\n");
+    exit;
+}
+
 header('Content-Type: text/plain; charset=utf-8');
 
 function say(int $status, string $message): never {

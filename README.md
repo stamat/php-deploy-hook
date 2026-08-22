@@ -40,11 +40,21 @@ git clone https://github.com/you/your-site.git /home/you/site
 cp deploy.php /home/you/public_html/deploy.php
 ```
 
-`deploy.config.php`, beside `deploy.php`:
+Then write the config next to it, rather than typing one — a hand-written config
+with a missing semicolon in it fails as an empty `500`, which says nothing about
+where to look:
+
+```bash
+cd /home/you/public_html
+php deploy.php > deploy.config.php     # generates the secret, leaves the paths blank
+php -l deploy.config.php               # it parses, and now you know
+```
+
+Then fill in the paths it left as placeholders:
 
 ```php
 <?php
-define('DEPLOY_SECRET', '…');                       // php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
+define('DEPLOY_SECRET', '…generated for you…');
 define('DEPLOY_REPO',   '/home/you/site');          // the checkout
 define('DEPLOY_BRANCH', 'main');
 define('DEPLOY_PUBLISH', [                          // what to copy out of it, and where
@@ -52,6 +62,9 @@ define('DEPLOY_PUBLISH', [                          // what to copy out of it, a
 ]);
 define('DEPLOY_LOG',    '/home/you/deploy.log');    // outside the web root; '' sends it to error_log
 ```
+
+The paths are placeholders rather than guesses on purpose: a config that parses
+and points at the wrong directory deploys nothing and says it worked.
 
 Then GitHub → repository → **Settings → Webhooks → Add webhook**:
 

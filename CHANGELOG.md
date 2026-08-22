@@ -46,12 +46,16 @@ push a week. GitHub already knows the moment you pushed.
   over the old one.
 - Every answer — deploys, refusals and ignored events — written to `DEPLOY_LOG`,
   because a webhook that silently does nothing is the failure people actually hit.
+- `php deploy.php` from a shell prints a config with a generated secret and the
+  paths left as placeholders, so nobody has to hand-write one. A typo in a
+  hand-written config surfaces as an empty `500` with nothing in the body, which
+  is the least helpful failure this project had.
 - The README says what an empty response means: every path here prints a
   sentence, so a blank `500` is PHP dying before the script runs — which leaves
   `deploy.config.php` as the only candidate.
 - Form-encoded payloads are understood, not just JSON. GitHub's webhook form
   defaults to `application/x-www-form-urlencoded`, and the mismatch showed up as
   a ping answering `pong` and every push after it answering `400`.
-- `test/run.php`: fourteen guarantees driven over HTTP against a real git
+- `test/run.php`: fifteen guarantees driven over HTTP against a real git
   repository, including a force-push upstream and a branch name carrying a shell
   command, with no test framework to install.
