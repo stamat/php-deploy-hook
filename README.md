@@ -112,6 +112,22 @@ file only you can edit. Nothing in a request chooses a path.
 **Deploy from anywhere but `DEPLOY_BRANCH`.** A push to any other branch is
 answered and ignored.
 
+## When it answers nothing
+
+Every path in `deploy.php` prints a sentence, so **an empty body is never this
+file talking**. An empty `500` with `Content-Type: text/html` means PHP died
+before the script ran, with `display_errors` off — and the only thing that runs
+before the first `header()` call is `deploy.config.php`.
+
+```bash
+php -l /path/to/deploy.config.php     # a parse error there is the usual answer
+sudo tail -30 /var/log/apache2/error.log
+```
+
+A `404` means Apache is not serving that path, or a rewrite rule swallowed it. A
+`200` showing you the source of the file means PHP is not handling `.php` in that
+directory at all.
+
 ## Limits, stated plainly
 
 - **`proc_open` must be available.** Plenty of shared hosting disables it. There
