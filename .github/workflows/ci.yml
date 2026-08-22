@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+# This workflow only reads the repository; say so, and the token can do no more.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8.1 is the floor the README claims; the newest catches deprecations early.
+        # Linux only: this deploys to Linux hosts, and the tests drive /dev/null and
+        # a real git checkout.
+        php: ["8.1", "8.4"]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Install dependencies
+        run: script/bootstrap
+
+      - name: Lint
+        run: script/lint
+
+      - name: Test
+        run: script/test
+
+      - name: Build
+        run: script/build

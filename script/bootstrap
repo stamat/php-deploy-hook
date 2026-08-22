@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Install everything needed to work on this project, from a fresh clone.
+#
+# There is nothing to install. This script says so, and fails early if the two
+# things the tests need are missing.
+
+set -euo pipefail
+
+php -r 'exit(PHP_VERSION_ID >= 80100 ? 0 : 1);' || {
+  echo "php-deploy-hook needs PHP 8.1 or newer; this is $(php -r 'echo PHP_VERSION;')" >&2
+  exit 1
+}
+
+command -v git > /dev/null || { echo "git is missing, and the tests deploy from a real repository" >&2; exit 1; }
+
+echo "nothing to install: one file and the standard library"

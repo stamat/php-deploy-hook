@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# Produce the artifacts the project ships.
+#
+# deploy.php ships as the file you can read. A build step would mean the thing
+# you upload is not the thing you reviewed, which is the opposite of the point.
+
+set -euo pipefail
+
+echo "nothing to build: deploy.php is the artifact"

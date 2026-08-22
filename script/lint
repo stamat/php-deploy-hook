@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Run the linters and formatters in check mode.
+
+set -euo pipefail
+
+status=0
+while IFS= read -r file; do
+  php -l "$file" > /dev/null || status=1
+done < <(find . -name '*.php' -not -path './vendor/*')
+
+[ "$status" -eq 0 ] && echo "php -l clean"
+exit "$status"

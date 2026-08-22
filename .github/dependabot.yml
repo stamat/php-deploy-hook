@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # No package ecosystem: no Composer, no npm. The actions the workflow pins are
+  # the only thing here with a version. If a dependency ever appears, read
+  # CONTRIBUTING.md first — it says why it should not.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7

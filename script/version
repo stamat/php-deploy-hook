@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Write $1 into whatever file holds this project's version.
+#
+# Commit nothing — script/publish stages and commits what you write.
+
+set -euo pipefail
+
+version="${1:-}"
+[ -n "$version" ] || { echo "usage: script/version <version>" >&2; exit 1; }
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+perl -i -pe "s/^const DEPLOY_VERSION = '.*';\$/const DEPLOY_VERSION = '$version';/" "$root/deploy.php"
+
+grep -q "const DEPLOY_VERSION = '$version';" "$root/deploy.php" || {
+  echo "failed to write the version into deploy.php" >&2
+  exit 1
+}

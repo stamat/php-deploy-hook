@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# Run the hook locally against a throwaway repository, on http://127.0.0.1:8000.
+#
+# Prints a curl command that posts a correctly signed push, since an unsigned one
+# is all you can send by hand.
+
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+work="$root/.local"
+secret="local-secret"
+
+rm -rf "$work"
+mkdir -p "$work/web" "$work/live"
+
+git init --quiet -b main "$work/origin"
+git -C "$work/origin" config user.email dev@example.com
+git -C "$work/origin" config user.name dev
+echo "<?php echo 'hello';" > "$work/origin/index.php"
+git -C "$work/origin" add -A
+git -C "$work/origin" commit --quiet -m "first"
+git clone --quiet "$work/origin" "$work/checkout"
+
+cp "$root/deploy.php" "$work/web/deploy.php"
+cat > "$work/web/deploy.config.php" <<PHP
+<?php
+define('DEPLOY_SECRET', '$secret');
+define('DEPLOY_REPO', '$work/checkout');
+define('DEPLOY_BRANCH', 'main');
+define('DEPLOY_PUBLISH', ['index.php' => '$work/live/index.php']);
+define('DEPLOY_LOG', '$work/deploy.log');
+PHP
+
+body='{"ref":"refs/heads/main"}'
+signature="sha256=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$secret" | sed 's/^.*= //')"
+
+cat <<MSG
+posting a push to it looks like this:
+
+  curl -i -X POST http://127.0.0.1:8000/deploy.php \\
+    -H 'X-GitHub-Event: push' \\
+    -H 'X-Hub-Signature-256: $signature' \\
+    -d '$body'
+
+commit something in $work/origin first, or it will deploy the same thing twice.
+MSG
+
+exec php -S 127.0.0.1:8000 -t "$work/web"
