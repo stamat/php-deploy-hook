@@ -149,6 +149,22 @@ it('a payload larger than a megabyte is refused rather than parsed', function ()
 
 // --- what it does when the signature is good ---------------------------------
 
+it('a form-encoded push is understood too, since that is what the webhook form defaults to', function () {
+    commit('form-encoded');
+
+    // What GitHub sends when Content type is left at application/x-www-form-urlencoded.
+    [$status, $body] = post('push', 'payload=' . urlencode(push_payload()));
+    assert_that($status === 200, "a form-encoded push was answered $status: $body");
+    assert_that(str_contains((string) file_get_contents($GLOBALS['live'] . '/index.php'), 'form-encoded'),
+        'a form-encoded push did not deploy');
+});
+
+it('a body that is neither JSON nor a payload field is refused with a reason', function () {
+    [$status, $body] = post('push', 'this is not a payload at all');
+    assert_that($status === 400, "junk was answered $status");
+    assert_that(str_contains($body, 'payload='), "the reason does not mention the form field: $body");
+});
+
 it('a push to the deploy branch updates the checkout and publishes the file', function () {
     commit('two');
 

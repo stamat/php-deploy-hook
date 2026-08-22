@@ -89,7 +89,17 @@ if ($event === 'ping') say(200, 'pong');
 if ($event !== 'push') say(202, "ignored: $event is not a push");
 
 $payload = json_decode($body, true);
-if (!is_array($payload)) say(400, 'payload is not JSON');
+
+// GitHub's webhook form defaults to application/x-www-form-urlencoded, which
+// wraps the JSON in a payload= field. The signature covers the raw body either
+// way, so this only decides how the ref is read — but getting it wrong looks like
+// a deploy that answers 400 to every push while the ping says pong.
+if (!is_array($payload) && str_starts_with($body, 'payload=')) {
+    parse_str($body, $form);
+    $payload = json_decode((string) ($form['payload'] ?? ''), true);
+}
+
+if (!is_array($payload)) say(400, 'payload is neither JSON nor a payload= form field');
 
 $ref = (string) ($payload['ref'] ?? '');
 if ($ref !== 'refs/heads/' . DEPLOY_BRANCH) say(202, 'ignored: ' . substr($ref, 0, 100));

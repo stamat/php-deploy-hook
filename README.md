@@ -58,7 +58,7 @@ Then GitHub → repository → **Settings → Webhooks → Add webhook**:
 | Field | Value |
 | --- | --- |
 | Payload URL | `https://yoursite.com/deploy.php` |
-| Content type | `application/json` |
+| Content type | `application/json` — `form` works too, it is just noisier |
 | Secret | the same string as `DEPLOY_SECRET` |
 | SSL verification | enabled |
 | Which events | just the push event |
@@ -84,12 +84,19 @@ inside the checkout, never at its root. Serving the root publishes `.git`, and
 | A wrong or missing signature | `401`, before the payload is parsed |
 | Any method but POST | `405` |
 | A payload over 1 MB | `413` |
+| A body that is neither JSON nor `payload=` | `400` |
 | A push to another branch | `202 ignored: refs/heads/…` |
 | Any other event | `202` |
 | GitHub's ping | `200 pong` |
 
 Every one of those is written to `DEPLOY_LOG`, because the failure people
 actually hit is a webhook that silently does nothing.
+
+Both content types are accepted. GitHub's form defaults to
+`application/x-www-form-urlencoded`, which wraps the JSON in a `payload` field —
+the signature covers the raw body either way, so the only symptom of the
+mismatch would have been a webhook that answers `pong` to the ping and `400` to
+every push after it.
 
 ## What it will not do
 
