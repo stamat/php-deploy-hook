@@ -177,6 +177,47 @@ it('a payload larger than a megabyte is refused rather than parsed', function ()
     assert_that($status === 413, "an oversized payload was answered $status");
 });
 
+it('a read-only web root still gets the file, since the file itself is writable', function () {
+    // What a hardened host looks like: the directory belongs to root, the one file
+    // the deploy owns belongs to the web server.
+    $locked = $GLOBALS['root'] . '/locked-root';
+    mkdir($locked);
+    $target = $locked . '/index.php';
+    file_put_contents($target, "<?php echo 'old';\n");
+    chmod($locked, 0555);
+
+    $web = $GLOBALS['root'] . '/web3';
+    mkdir($web);
+    copy(__DIR__ . '/../deploy.php', $web . '/deploy.php');
+    file_put_contents($web . '/deploy.config.php', "<?php\n"
+        . "define('DEPLOY_SECRET', " . var_export($GLOBALS['secret'], true) . ");\n"
+        . "define('DEPLOY_REPO', " . var_export($GLOBALS['repo'], true) . ");\n"
+        . "define('DEPLOY_BRANCH', 'main');\n"
+        . "define('DEPLOY_PUBLISH', ['index.php' => " . var_export($target, true) . "]);\n");
+
+    commit('into a read-only directory');
+
+    $proc = proc_open([PHP_BINARY, '-S', '127.0.0.1:8473', '-t', $web],
+        [1 => ['file', '/dev/null', 'w'], 2 => ['file', $web . '/log', 'w']], $pipes);
+    for ($i = 0; $i < 50 && !@fsockopen('127.0.0.1', 8473, $e, $s, 0.1); $i++) usleep(100_000);
+
+    $body = push_payload();
+    $ctx = stream_context_create(['http' => [
+        'method'  => 'POST',
+        'header'  => "X-GitHub-Event: push\r\nX-Hub-Signature-256: sha256=" . hash_hmac('sha256', $body, $GLOBALS['secret']) . "\r\nContent-Type: application/json",
+        'content' => $body, 'ignore_errors' => true, 'timeout' => 10,
+    ]]);
+    $out = (string) file_get_contents('http://127.0.0.1:8473/deploy.php', false, $ctx);
+    proc_terminate($proc);
+    chmod($locked, 0755);
+
+    if (is_writable($locked)) return;   // running as root: nothing to fall back from
+
+    assert_that(str_contains($out, 'deployed'), "a writable file in a read-only directory was refused: $out");
+    assert_that(str_contains((string) file_get_contents($target), 'into a read-only directory'),
+        'the fallback did not actually replace the file');
+});
+
 it('a checkout it cannot reach is explained in terms of the user, not of git', function () {
     // Point an install at a directory that is not a checkout at all.
     $elsewhere = $GLOBALS['root'] . '/not-a-checkout';

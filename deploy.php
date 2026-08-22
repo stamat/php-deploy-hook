@@ -88,20 +88,38 @@ function git(array $args): array {
 }
 
 /**
- * Copies one file into place through a temporary name. Rename is atomic, so a
- * request arriving mid-deploy gets the whole old file or the whole new one, and
- * never the half-written thing in between.
+ * Copies one file into place, atomically where that is allowed.
+ *
+ * The temporary-name-then-rename dance needs write permission on the destination
+ * *directory*, and a writable web root is the thing every hardening guide tells
+ * you not to have. So when only the file itself is writable, it is overwritten in
+ * place instead: a request arriving during those microseconds can read a partial
+ * file, which is worth less than making people chmod their web root.
+ *
+ * Returns '' on success, or what was missing.
  */
-function publish(string $from, string $to): bool {
-    if (!is_file($from)) return false;
+function publish(string $from, string $to): string {
+    if (!is_file($from)) return "$from is not in the checkout";
 
-    $temp = $to . '.deploy-new';
-    if (!@copy($from, $temp)) return false;
-    if (!@rename($temp, $to)) {
-        @unlink($temp);
-        return false;
+    $dir = dirname($to);
+    if (is_writable($dir)) {
+        $temp = $to . '.deploy-new';
+        if (!@copy($from, $temp)) return "could not write $temp";
+        if (!@rename($temp, $to)) {
+            @unlink($temp);
+            return "could not rename $temp onto $to";
+        }
+        return '';
     }
-    return true;
+
+    if (is_file($to) && is_writable($to)) {
+        $bytes = @file_put_contents($to, (string) file_get_contents($from), LOCK_EX);
+        return $bytes === false ? "could not write $to" : '';
+    }
+
+    return "$to is not writable by " . whoami() . ", and neither is $dir."
+        . ' Either give that user the file (chown ' . whoami() . " $to), which is enough,"
+        . ' or the directory, which also lets deploys create files that were not there before.';
 }
 
 
@@ -172,8 +190,8 @@ if ($code !== 0) say(500, "reset failed: $out");
 
 $published = 0;
 foreach (DEPLOY_PUBLISH as $from => $to) {
-    if (!publish(rtrim(DEPLOY_REPO, '/') . '/' . ltrim($from, '/'), $to)) {
-        say(500, "could not publish $from");
+    if ($why = publish(rtrim(DEPLOY_REPO, '/') . '/' . ltrim($from, '/'), $to)) {
+        say(500, "could not publish $from: $why");
     }
     $published++;
 }

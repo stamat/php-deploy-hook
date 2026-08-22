@@ -123,6 +123,16 @@ a password on it, and the blast radius of a mistake stops being "the wrong
 version is live". If your deploy needs to build something, build it in CI and
 commit or release the result.
 
+**Demand a writable web root.** Publishing prefers a temporary file and an
+atomic rename, which needs write permission on the destination *directory*. When
+only the destination file is writable — which is how a hardened web root looks —
+it overwrites in place instead, and a request landing in those microseconds can
+read a partial file. Giving the deploy user the one file it replaces is enough:
+
+```bash
+sudo chown www-data:www-data /var/www/site/public_html/index.php
+```
+
 **Write anything outside `DEPLOY_PUBLISH`.** The destinations are constants in a
 file only you can edit. Nothing in a request chooses a path.
 
