@@ -177,6 +177,36 @@ it('a payload larger than a megabyte is refused rather than parsed', function ()
     assert_that($status === 413, "an oversized payload was answered $status");
 });
 
+it('a checkout it cannot reach is explained in terms of the user, not of git', function () {
+    // Point an install at a directory that is not a checkout at all.
+    $elsewhere = $GLOBALS['root'] . '/not-a-checkout';
+    mkdir($elsewhere);
+
+    $web = $GLOBALS['root'] . '/web2';
+    mkdir($web);
+    copy(__DIR__ . '/../deploy.php', $web . '/deploy.php');
+    file_put_contents($web . '/deploy.config.php', "<?php\n"
+        . "define('DEPLOY_SECRET', " . var_export($GLOBALS['secret'], true) . ");\n"
+        . "define('DEPLOY_REPO', " . var_export($elsewhere, true) . ");\n"
+        . "define('DEPLOY_BRANCH', 'main');\n");
+
+    $proc = proc_open([PHP_BINARY, '-S', '127.0.0.1:8472', '-t', $web],
+        [1 => ['file', '/dev/null', 'w'], 2 => ['file', $web . '/log', 'w']], $pipes);
+    for ($i = 0; $i < 50 && !@fsockopen('127.0.0.1', 8472, $e, $s, 0.1); $i++) usleep(100_000);
+
+    $body = push_payload();
+    $ctx = stream_context_create(['http' => [
+        'method'  => 'POST',
+        'header'  => "X-GitHub-Event: push\r\nX-Hub-Signature-256: sha256=" . hash_hmac('sha256', $body, $GLOBALS['secret']) . "\r\nContent-Type: application/json",
+        'content' => $body, 'ignore_errors' => true, 'timeout' => 10,
+    ]]);
+    $out = (string) file_get_contents('http://127.0.0.1:8472/deploy.php', false, $ctx);
+    proc_terminate($proc);
+
+    assert_that(str_contains($out, 'not a readable git checkout'), "the answer does not name the problem: $out");
+    assert_that(str_contains($out, '/srv'), "the answer does not say where to put it instead: $out");
+});
+
 // --- what it does when the signature is good ---------------------------------
 
 it('a form-encoded push is understood too, since that is what the webhook form defaults to', function () {

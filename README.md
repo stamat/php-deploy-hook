@@ -33,11 +33,14 @@ ways. This is that gist with the leaks closed.
 ## Install
 
 ```bash
-# the checkout lives outside the web root, so nobody can fetch .git/config
-git clone https://github.com/you/your-site.git /home/you/site
+# outside the web root, but somewhere the web server can actually reach: not
+# /root, and not a home directory — those are 0700, and every directory above the
+# checkout has to be traversable by the web server user, not just the checkout
+sudo git clone https://github.com/you/your-site.git /srv/your-site
+sudo chown -R www-data:www-data /srv/your-site
 
 # the hook is the only thing the web sees
-cp deploy.php /home/you/public_html/deploy.php
+sudo cp deploy.php /var/www/your-site/public_html/deploy.php
 ```
 
 Then write the config next to it, rather than typing one — a hand-written config
@@ -98,6 +101,7 @@ inside the checkout, never at its root. Serving the root publishes `.git`, and
 | Any method but POST | `405` |
 | A payload over 1 MB | `413` |
 | A body that is neither JSON nor `payload=` | `400` |
+| `DEPLOY_REPO` unreachable or not a checkout | `500`, naming the user and where to put it |
 | A push to another branch | `202 ignored: refs/heads/…` |
 | Any other event | `202` |
 | GitHub's ping | `200 pong` |

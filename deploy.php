@@ -56,6 +56,17 @@ function say(int $status, string $message): never {
 }
 
 /**
+ * Who this process is, for a message about permissions. The whole class of problem
+ * is that the web server is not the person who ran the clone.
+ */
+function whoami(): string {
+    if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+        return (posix_getpwuid(posix_geteuid())['name'] ?? '') ?: 'this user';
+    }
+    return get_current_user() ?: 'this user';
+}
+
+/**
  * Runs git as an argument array, never a command string. Nothing from the request
  * reaches this, and nothing here can be turned into a second command by a quote.
  */
@@ -131,6 +142,22 @@ if ($ref !== 'refs/heads/' . DEPLOY_BRANCH) say(202, 'ignored: ' . substr($ref, 
 
 
 // ---- the deploy -------------------------------------------------------------
+
+// A checkout under /root or a home directory is the usual reason this fails: the
+// directory is 0700, the web server is not that user, and git's own answer is
+// "cannot change to …: Permission denied" with no hint about which user it means.
+if (!is_dir(DEPLOY_REPO)) {
+    say(500, DEPLOY_REPO . ' is not a directory. DEPLOY_REPO must be a git checkout the web server can read.');
+}
+if (!is_readable(DEPLOY_REPO) || !is_dir(DEPLOY_REPO . '/.git')) {
+    say(500, DEPLOY_REPO . ' is not a readable git checkout for ' . whoami()
+        . '. A checkout under /root or a home directory is unreachable however open its own permissions are,'
+        . ' because every directory above it must be traversable too — put it somewhere like /srv or /var/www.');
+}
+if (!is_writable(DEPLOY_REPO . '/.git')) {
+    say(500, DEPLOY_REPO . '/.git is not writable by ' . whoami()
+        . '. git writes there on every fetch: chown -R ' . whoami() . ' ' . DEPLOY_REPO);
+}
 
 // fetch and reset, not pull: a deploy target has no local work worth merging, and
 // `pull --ff-only` fails after a force-push upstream — which leaves the site on an
